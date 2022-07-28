@@ -36,17 +36,17 @@ class Config:
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")  # 检测GPU
         self.seed = 10 # 随机种子，置0则不设置随机种子
-        self.train_eps = 200 # 训练的回合数
+        self.train_eps = 500 # 训练的回合数
         self.test_eps = 20 # 测试的回合数
         ################################################################################
         
         ################################## 算法超参数 ###################################
         self.gamma = 0.8 # 折扣因子
-        self.critic_lr = 1e-2 # 评论家网络的学习率 之前-3
-        self.actor_lr = 1e-3 # 演员网络的学习率   之前-4
+        self.critic_lr = 1e-3 # 评论家网络的学习率 之前-3
+        self.actor_lr = 1e-4 # 演员网络的学习率   之前-4
         self.memory_capacity = 5120 # 经验回放的容量
-        self.batch_size = 4 # mini-batch SGD中的批量大小
-        self.target_update = 2 # 目标网络的更新频率
+        self.batch_size = 64 # mini-batch SGD中的批量大小
+        self.target_update = 4 # 目标网络的更新频率
         self.hidden_dim = 128 # 网络隐藏层维度
         self.soft_tau = 1e-2 # 软更新参数
         ################################################################################
@@ -96,7 +96,7 @@ def train(cfg, env, agent):
         while not done:
             i_step += 1
             action = agent.choose_action(state)
-            action = gau_noise.get_action(action, i_step)  # 加噪, 但推荐在step里进行逆归一化
+            action = gau_noise.get_action(action, i_ep)  # 加噪, 但推荐在step里进行逆归一化
             next_state, reward, done = env.step(action)  # 会返回布尔值，决定了更新
             ep_reward += reward
             agent.memory.push(state, action, reward, next_state, done)
@@ -125,7 +125,6 @@ def test(cfg, env, agent):
         i_step = 0  # 步长
         while not done:
             i_step += 1
-            # env.render()
             action = agent.choose_action(state)
             next_state, reward, done = env.step(action)
             ep_reward += reward  # 每一个episode累计

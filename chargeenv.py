@@ -29,7 +29,8 @@ class ChargeEnv(gym.Env):
         self.eu = 5.6
         self.reset_flag = 1
         self.sensor_pos = None
-        self.out_penalty = 80 # 动作出界惩罚
+        self.out_penalty = 1000 # 动作出界惩罚
+        self.i_step = 0 # 记录动作步数
 
         self.action_space = spaces.Box(
             low=-1000, high=1000, shape=(1,2), dtype=np.float32
@@ -43,11 +44,11 @@ class ChargeEnv(gym.Env):
 
 
     def step(self, action):
-        action = action * 500 #action的范围是-1~+1（加噪声），在这个地方逆归一化
+        action = action * 1000 #action的范围是-1~+1（加噪声），在这个地方逆归一化
         state = self.state
-        # print(state)
         next_state = state
         next_state[self.N], next_state[self.N+1] = state[self.N] + action[0][0], state[self.N+1] + action[0][1]
+        self.i_step = self.i_step + 1
 
         # 出界判断
         out_flag = 0  # 出界标志，出界则引入惩罚
@@ -58,6 +59,7 @@ class ChargeEnv(gym.Env):
             if next_state[self.N+i] < 0:
                 next_state[self.N+i] = 0
                 out_flag = 1
+        # print('state:(',next_state[self.N],'，',next_state[self.N+1],')')
         d_move = math.sqrt(math.pow(action[0][0],2)+math.pow(action[0][1],2))
         cost_m = d_move*self.eu + out_flag * self.out_penalty
 
@@ -67,7 +69,7 @@ class ChargeEnv(gym.Env):
         done = True  # False:未完成充电
         T_max = 0
         s_pos = self.sensor_pos
-        d_th = math.sqrt(self.alpha * self.pc / self.pr_th) - self.beta
+        d_th = math.sqrt(self.alpha * self.pc / self.pr_th) - self.beta # 充电的阈值距离
         c_total = 0 # 当前状态充电总量
         for i in range(self.N): # 把范围内的传感器充电置零，并获得最长充电时间
             d = math.sqrt(math.pow(s_pos[i][0] - pos_x, 2) + math.pow(s_pos[i][1] - pos_y, 2))
@@ -75,15 +77,15 @@ class ChargeEnv(gym.Env):
                 pr = self.alpha * self.pc / math.pow(d + self.beta, 2)
                 t = state[i]/pr
                 c_total = c_total + state[i]
-                print(c_total)
+                # print(c_total)
                 if (t > T_max):
                     T_max = t
                 next_state[i] = 0
         cost_p = self.pc * T_max
 
-        print('dadefsrgsw',action)
-        reward = c_total/(cost_p+cost_m)
-
+        # print('action:',action)
+        reward = c_total * 10000 - (cost_p+cost_m) - self.i_step * 10
+        # reward = - (cost_p+cost_m)
         # print(reward)
         c_total = 0
         for i in range(self.N):
@@ -98,6 +100,7 @@ class ChargeEnv(gym.Env):
         state_t = np.append(state_t, self.x)
         state_t = np.append(state_t, self.y)
         self.state = state_t
+        self.i_step = 0
 
         return self.state
 

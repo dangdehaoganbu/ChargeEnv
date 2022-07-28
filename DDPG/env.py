@@ -59,7 +59,7 @@ class OUNoise(object):
 class GaussianNoise(object):
     '''高斯噪声
     '''
-    def __init__(self, action_space, mu=0.0, sigma=10, max_sigma=0.3, min_sigma=0.2, decay_period=100000):
+    def __init__(self, action_space, mu=0.0, sigma= 0, max_sigma=0.3, min_sigma=0.2, decay_period=100000):
         self.mu           = mu # 高斯噪声的参数
         self.sigma        = sigma # 高斯噪声的参数
         self.max_sigma    = max_sigma
@@ -73,10 +73,16 @@ class GaussianNoise(object):
     def reset(self):
         self.obs = np.ones(self.n_actions) * self.mu
 
-    def get_action(self, action, t=0):
-        # action[0][0] = action[0][0] + random.gauss(self.mu, self.sigma)
-        # action[0][1] = action[0][1] + random.gauss(self.mu, self.sigma) # 感觉这种类似遍历的方法有些笨笨的，有没有更优雅的方法
+    def get_action(self, action, i_ep):
+        self.sigma = self.sigma + min(50/(i_ep+1), 0.5)
         [noi_0, noi_1] = [random.gauss(self.mu, self.sigma), random.gauss(self.mu, self.sigma)]
-        # self.sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(1.0, t / self.decay_period) # sigma会逐渐衰减
         # 等学习reward足够好了再来调整这个从前到后的更新
-        return np.clip((action + [noi_0, noi_1]), -1, 1)  # 动作加上噪声后进行剪切
+        action = action + [noi_0, noi_1]
+        for i in range(2):
+            if action[0][i] >= 0:
+                action[0][i] = action[0][i] % 1
+            else:
+                action[0][i] = - (1 - (action[0][i] % 1))
+
+        #return np.clip((action + [noi_0, noi_1]), -1, 1)  # 动作加上噪声后进行剪切
+        return action
